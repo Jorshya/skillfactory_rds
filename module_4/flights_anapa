@@ -1,1 +1,234 @@
-1.1
+# module_04
+SQL
+4.1
+select
+    city,
+    count(airport_code) count_airport
+from dst_project.airports
+group by city
+having count(airport_code) >= 2
+order by 2 desc
+
+4.2.3
+
+select 
+    count(distinct seat_no)
+
+from dst_project.aircrafts m
+    join dst_project.seats s on s.aircraft_code = m.aircraft_code
+where m.model = 'Boeing 777-300'
+
+4.2.4
+select 
+    count(flight_id)
+
+from dst_project.flights
+where 
+    actual_arrival between '2017-04-01' and '2017-09-01' and
+    status = 'Arrived'
+    
+4.3.2
+select 
+    'Boeing'as model_brand,
+     count('Boeing')
+
+from dst_project.aircrafts
+
+4.5.1
+select 
+
+    fare_conditions,
+    count(fare_conditions) as count_class
+    
+from dst_project.seats 
+WHERE aircraft_code = 'SU9'
+
+group by fare_conditions
+
+4.5.2
+select 
+    min(total_amount)
+
+from dst_project.bookings
+
+
+order by count_class desc
+WHERE model LIKE 'Boeing%'
+group by model_brand
+
+union all
+
+select 
+    'Airbus'as model_brand,
+     count('Airbus')
+
+from dst_project.aircrafts
+WHERE model LIKE 'Airbus%'
+group by model_brand
+
+union all
+
+select 
+    'Sukhoi'as model_brand,
+     count('Sukhoi')
+
+from dst_project.aircrafts
+WHERE model LIKE 'Sukhoi%'
+group by model_brand
+
+4.3.3
+select
+    timezone,
+    count (timezone) as count_area
+from dst_project.airports
+group by
+    timezone
+order by count_area desc
+limit 2
+
+4.3.4
+select
+    flight_id,
+    (actual_arrival - scheduled_arrival) as delay
+from dst_project.flights
+where status = 'Arrived'
+order by delay desc
+limit 1
+
+4.4.2
+select
+    max(extract(epoch
+                   from (scheduled_arrival - scheduled_departure))) / 60 AS flight_time
+from dst_project.flights
+
+4.4.3
+select
+    (scheduled_arrival-scheduled_departure) as flight_time,
+    departure_airport,
+    arrival_airport
+
+from dst_project.flights
+where status = 'Scheduled'
+order by flight_time desc
+
+4.4.4
+select
+    avg(extract(epoch
+                   from (scheduled_arrival - scheduled_departure))) / 60 AS flight_time
+from dst_project.flights
+
+4.4.5
+select
+    b.seat_no
+from dst_project.boarding_passes b 
+    join dst_project.tickets t on b.ticket_no = t.ticket_no
+where passenger_id = '4313 788533'
+
+
+5.1.1
+select 
+    count(arrival_airport)
+
+from dst_project.flights
+where 
+    actual_arrival between '2017-01-01' and '2017-12-31'
+    and arrival_airport = 'AAQ'
+    
+4.1.2   
+    select 
+    count(arrival_airport)
+
+from dst_project.flights
+where 
+    ((actual_arrival between '2017-01-01' and '2017-03-01') 
+    or (actual_arrival between '2017-12-01' and '2017-12-31'))
+    and departure_airport = 'AAQ'
+    
+ 4.1.3
+select 
+    count(status)
+
+from dst_project.flights
+where 
+    departure_airport  = 'AAQ'
+    and status = 'Cancelled'
+    
+4.1.4
+select 
+    count(departure_airport)
+
+from dst_project.flights
+where 
+    departure_airport = 'AAQ'
+    and arrival_airport !='DME'
+    and arrival_airport !='SVO'
+    and arrival_airport !='VKO'
+
+4.1.5
+select 
+    m.model,
+    count(distinct seat_no)
+
+from dst_project.aircrafts m
+    join dst_project.seats s on s.aircraft_code = m.aircraft_code
+    join dst_project.flights f on f.aircraft_code = s.aircraft_code
+where departure_airport = 'AAQ'
+group by m.model
+
+
+**Финальный запрос**
+
+
+with qty_seat as -- высчитываем кол-во места для каждого самолета
+(
+select 
+	aircraft_code,
+	count(distinct seat_no) seat_qty
+from dst_project.seats
+group by 1
+),flight_revenue as -- высчитываем выручку и 
+(
+select 
+	flight_id,
+	sum(amount) flight_revenue
+from dst_project.ticket_flights
+group by 1
+) 
+, 
+booked_seats as -- высчитываем кол-во занятых мест на каждом полете
+(
+select 
+flight_id,
+count(distinct seat_no) qty_booked_seats
+from dst_project.boarding_passes
+group by 1
+order by 1
+	)
+SELECT
+f.flight_id,
+a.model airplane_model,
+extract(epoch from (f.actual_arrival-f.actual_departure)) / 60 AS flight_time,
+fr.flight_revenue,
+s.seat_qty,
+f.arrival_airport,
+arprt.city arrival_city,
+bs.qty_booked_seats,
+f.actual_departure,
+f.actual_arrival
+
+	
+FROM dst_project.flights f
+join dst_project.aircrafts a
+	on f.aircraft_code = a.aircraft_code -- в этом объединении нам необходимо извлечь наимнование самолетов
+join qty_seat s
+	on a.aircraft_code = s.aircraft_code -- в этом объединении добавляем кол-во мест в каждом самолете
+left join flight_revenue fr 
+    on f.flight_id = fr.flight_id        -- в этом объединении добавляем столбец с выручкой
+join dst_project.airports arprt
+	on f.arrival_airport = arprt.airport_code -- в этом объединении добавляем названия городов по коду аэропорта
+join booked_seats bs
+	on f.flight_id = bs.flight_id            -- в этом объединении добавляем кол-во забронированных мест в каждом самолете
+WHERE departure_airport = 'AAQ'
+  AND (date_trunc('month', scheduled_departure) in ('2017-01-01','2017-02-01', '2017-12-01'))
+  AND status not in ('Cancelled')
+order by 1
